@@ -52,6 +52,10 @@ contract PawfundFactoryTest is Test {
         assertEq(campaign.endAt(), END_AT);
         assertEq(campaign.totalDonated(), 0);
         assertEq(campaign.totalWithdrawn(), 0);
+        assertEq(campaign.totalRefunded(), 0);
+        assertFalse(campaign.cancelled());
+        assertEq(campaign.refundLiability(), 0);
+        assertEq(campaign.withdrawableBalance(), 0);
     }
 
     function test_CreateCampaignEmitsEvent() external {

@@ -22,8 +22,11 @@ fundraiser can withdraw funds directly to the wallet configured when the campaig
 - `donate(uint256 amount)` accepts USDC until `endAt`.
 - `withdraw(uint256 amount)` only sends USDC to the fundraiser.
 - The fundraiser can make partial withdrawals at any time, including while the campaign is active.
+- The fundraiser can permanently cancel a fully funded campaign and enable donor refunds.
+- After cancellation, each donor claims their full recorded donation and only surplus USDC can be
+  withdrawn by the fundraiser.
 - `goalAmount` is informational. Donations may exceed the target.
-- There are no refunds, protocol fees, pause/cancel controls, or campaign configuration changes.
+- There are no protocol fees, pause controls, or campaign configuration changes.
 
 `goalAmount` and every `amount` parameter use USDC base units:
 
@@ -115,6 +118,9 @@ forge script script/DeployPawfundFactory.s.sol:DeployPawfundFactory \
 For mainnet, replace `base_sepolia` with `base_mainnet`. The script rejects every other chain and
 automatically selects the correct canonical USDC address.
 
+`PawfundFactory` embeds the campaign creation bytecode. Deploy a new factory whenever the campaign
+implementation changes; an already deployed factory cannot create campaigns with updated behavior.
+
 ## Creating a Campaign
 
 The factory owner creates a campaign using USDC base units and a UTC timestamp:
@@ -131,7 +137,7 @@ cast send <FACTORY_ADDRESS> \
 
 In this example, `10000000000` represents a target of `10,000 USDC`.
 
-## Donations and Withdrawals
+## Donations, Withdrawals, and Refunds
 
 A donor must grant the campaign an allowance before donating:
 
@@ -164,3 +170,46 @@ cast send <CAMPAIGN_ADDRESS> \
 
 USDC sent directly to the campaign with `transfer` can still be withdrawn by the fundraiser, but it
 is not included in `totalDonated` because it did not pass through the `donate` function.
+
+### Cancelling a Campaign
+
+Only the configured fundraiser can permanently cancel a campaign. Cancellation is available before
+or after `endAt`, but the campaign must hold at least `refundLiability()` USDC so every recorded
+donation remains refundable:
+
+```shell
+cast send <CAMPAIGN_ADDRESS> \
+  "cancelCampaign()" \
+  --rpc-url base_sepolia \
+  --account fundraiser
+```
+
+If previous withdrawals leave the campaign underfunded, the fundraiser must first return enough
+USDC directly to the campaign:
+
+```shell
+cast send <USDC_ADDRESS> \
+  "transfer(address,uint256)(bool)" \
+  <CAMPAIGN_ADDRESS> \
+  <TOP_UP_AMOUNT> \
+  --rpc-url base_sepolia \
+  --account fundraiser
+```
+
+Direct USDC transfers help satisfy the campaign's refund liability but do not create a refund right
+for the sender. Once cancellation succeeds, new donations are rejected and it cannot be reversed.
+
+### Claiming a Refund
+
+After cancellation, each donor claims their entire recorded donation from their own wallet:
+
+```shell
+cast send <CAMPAIGN_ADDRESS> \
+  "claimRefund()" \
+  --rpc-url base_sepolia \
+  --account donor
+```
+
+Refund rights do not expire. The fundraiser may continue to call `withdraw(uint256)`, but only for
+`withdrawableBalance()`, which excludes all refunds that donors have not claimed yet. Each donor's
+remaining entitlement can be queried with `refundableAmount(address)`.
