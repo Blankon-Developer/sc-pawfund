@@ -14,6 +14,7 @@ contract PawfundCampaignTest is Test {
     event CampaignCancelled(address indexed fundraiser, uint256 refundLiability);
     event RefundClaimed(address indexed donor, uint256 amount, uint256 totalRefunded);
 
+    bytes16 internal constant CAMPAIGN_ID = 0x550e8400e29b41d4a716446655440000;
     uint256 internal constant START_AT = 1_900_000_000;
     uint256 internal constant GOAL_AMOUNT = 1_000e6;
     uint256 internal constant END_AT = START_AT + 30 days;
@@ -41,7 +42,7 @@ contract PawfundCampaignTest is Test {
         PawfundFactory factory = new PawfundFactory(owner, usdc);
 
         vm.prank(owner);
-        campaign = PawfundCampaign(factory.createCampaign(fundraiser, GOAL_AMOUNT, END_AT));
+        campaign = PawfundCampaign(factory.createCampaign(CAMPAIGN_ID, fundraiser, GOAL_AMOUNT, END_AT));
 
         usdc.mint(donor, DONOR_BALANCE);
         usdc.mint(secondDonor, DONOR_BALANCE);

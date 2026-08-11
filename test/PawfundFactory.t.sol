@@ -9,8 +9,15 @@ import {PawfundFactory} from "../src/PawfundFactory.sol";
 import {MockUSDC} from "./mocks/MockUSDC.sol";
 
 contract PawfundFactoryTest is Test {
-    event CampaignCreated(address indexed campaign, address indexed fundraiser, uint256 goalAmount, uint256 endAt);
+    event CampaignCreated(
+        bytes16 indexed campaignId,
+        address indexed campaign,
+        address indexed fundraiser,
+        uint256 goalAmount,
+        uint256 endAt
+    );
 
+    bytes16 internal constant CAMPAIGN_ID = 0x550e8400e29b41d4a716446655440000;
     uint256 internal constant START_AT = 1_900_000_000;
     uint256 internal constant GOAL_AMOUNT = 10_000e6;
     uint256 internal constant END_AT = START_AT + 30 days;
@@ -43,7 +50,7 @@ contract PawfundFactoryTest is Test {
 
     function test_CreateCampaignReturnsConfiguredCampaign() external {
         vm.prank(owner);
-        address campaignAddress = factory.createCampaign(fundraiser, GOAL_AMOUNT, END_AT);
+        address campaignAddress = factory.createCampaign(CAMPAIGN_ID, fundraiser, GOAL_AMOUNT, END_AT);
 
         PawfundCampaign campaign = PawfundCampaign(campaignAddress);
         assertEq(address(campaign.usdc()), address(usdc));
@@ -59,39 +66,48 @@ contract PawfundFactoryTest is Test {
     }
 
     function test_CreateCampaignEmitsEvent() external {
-        vm.expectEmit(false, true, false, true, address(factory));
-        emit CampaignCreated(address(0), fundraiser, GOAL_AMOUNT, END_AT);
+        address campaignAddress = vm.computeCreateAddress(address(factory), 1);
+
+        vm.expectEmit(true, true, true, true, address(factory));
+        emit CampaignCreated(CAMPAIGN_ID, campaignAddress, fundraiser, GOAL_AMOUNT, END_AT);
 
         vm.prank(owner);
-        factory.createCampaign(fundraiser, GOAL_AMOUNT, END_AT);
+        factory.createCampaign(CAMPAIGN_ID, fundraiser, GOAL_AMOUNT, END_AT);
+    }
+
+    function test_RevertWhen_CampaignIdIsZero() external {
+        vm.expectRevert(PawfundFactory.InvalidCampaignId.selector);
+
+        vm.prank(owner);
+        factory.createCampaign(bytes16(0), fundraiser, GOAL_AMOUNT, END_AT);
     }
 
     function test_RevertWhen_NonOwnerCreatesCampaign() external {
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, stranger));
 
         vm.prank(stranger);
-        factory.createCampaign(fundraiser, GOAL_AMOUNT, END_AT);
+        factory.createCampaign(CAMPAIGN_ID, fundraiser, GOAL_AMOUNT, END_AT);
     }
 
     function test_RevertWhen_FundraiserIsZero() external {
         vm.expectRevert(PawfundCampaign.InvalidFundraiser.selector);
 
         vm.prank(owner);
-        factory.createCampaign(address(0), GOAL_AMOUNT, END_AT);
+        factory.createCampaign(CAMPAIGN_ID, address(0), GOAL_AMOUNT, END_AT);
     }
 
     function test_RevertWhen_GoalAmountIsZero() external {
         vm.expectRevert(PawfundCampaign.InvalidGoalAmount.selector);
 
         vm.prank(owner);
-        factory.createCampaign(fundraiser, 0, END_AT);
+        factory.createCampaign(CAMPAIGN_ID, fundraiser, 0, END_AT);
     }
 
     function test_RevertWhen_EndAtIsNotInFuture() external {
         vm.expectRevert(abi.encodeWithSelector(PawfundCampaign.InvalidEndAt.selector, START_AT));
 
         vm.prank(owner);
-        factory.createCampaign(fundraiser, GOAL_AMOUNT, START_AT);
+        factory.createCampaign(CAMPAIGN_ID, fundraiser, GOAL_AMOUNT, START_AT);
     }
 
     function test_OwnershipTransferRequiresAcceptance() external {

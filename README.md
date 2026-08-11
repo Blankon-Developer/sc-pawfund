@@ -10,10 +10,12 @@ fundraiser can withdraw funds directly to the wallet configured when the campaig
 
 - Owned by a single operator using OpenZeppelin `Ownable2Step`.
 - Only the owner can call
-  `createCampaign(address fundraiser, uint256 goalAmount, uint256 endAt)`.
+  `createCampaign(bytes16 campaignId, address fundraiser, uint256 goalAmount, uint256 endAt)`.
 - The factory uses one immutable canonical USDC address for every campaign.
 - Official campaigns are discovered through the `CampaignCreated` event; the factory does not
   maintain an on-chain registry.
+- `campaignId` is backend correlation metadata emitted by the factory. It is not stored by the
+  factory or campaign, and the factory does not enforce uniqueness or idempotency.
 - Ownership cannot be renounced, but it can be transferred through a two-step process.
 
 ### PawfundCampaign
@@ -120,14 +122,20 @@ automatically selects the correct canonical USDC address.
 
 `PawfundFactory` embeds the campaign creation bytecode. Deploy a new factory whenever the campaign
 implementation changes; an already deployed factory cannot create campaigns with updated behavior.
+The factory must also be redeployed for this `campaignId` release because both the function and
+event ABIs changed. Its constructor and deployment script remain unchanged.
 
 ## Creating a Campaign
 
-The factory owner creates a campaign using USDC base units and a UTC timestamp:
+The factory owner creates a campaign using a backend UUID, USDC base units, and a UTC timestamp.
+Convert the UUID directly to its 16 RFC-4122 bytes in the same byte order and remove the hyphens.
+For example, `550e8400-e29b-41d4-a716-446655440000` becomes
+`0x550e8400e29b41d4a716446655440000`:
 
 ```shell
 cast send <FACTORY_ADDRESS> \
-  "createCampaign(address,uint256,uint256)(address)" \
+  "createCampaign(bytes16,address,uint256,uint256)(address)" \
+  0x550e8400e29b41d4a716446655440000 \
   <FUNDRAISER_ADDRESS> \
   10000000000 \
   <END_AT_TIMESTAMP> \
@@ -135,7 +143,9 @@ cast send <FACTORY_ADDRESS> \
   --account pawfund-operator
 ```
 
-In this example, `10000000000` represents a target of `10,000 USDC`.
+In this example, `10000000000` represents a target of `10,000 USDC`. A zero campaign ID is rejected,
+but the same nonzero ID can be used more than once; the relayer or backend is responsible for
+preventing duplicate campaign creation.
 
 ## Donations, Withdrawals, and Refunds
 

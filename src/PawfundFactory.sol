@@ -10,10 +10,17 @@ import {PawfundCampaign} from "./PawfundCampaign.sol";
 /// @title PawfundFactory
 /// @notice Deploys official Pawfund campaigns for an authorized operator.
 contract PawfundFactory is Ownable2Step {
+    error InvalidCampaignId();
     error InvalidUSDC(address token);
     error OwnershipRenunciationDisabled();
 
-    event CampaignCreated(address indexed campaign, address indexed fundraiser, uint256 goalAmount, uint256 endAt);
+    event CampaignCreated(
+        bytes16 indexed campaignId,
+        address indexed campaign,
+        address indexed fundraiser,
+        uint256 goalAmount,
+        uint256 endAt
+    );
 
     IERC20 public immutable usdc;
 
@@ -27,14 +34,18 @@ contract PawfundFactory is Ownable2Step {
     }
 
     /// @notice Deploy an official Pawfund campaign.
-    function createCampaign(address fundraiser, uint256 goalAmount, uint256 endAt)
+    function createCampaign(bytes16 campaignId, address fundraiser, uint256 goalAmount, uint256 endAt)
         external
         onlyOwner
         returns (address campaign)
     {
+        if (campaignId == bytes16(0)) {
+            revert InvalidCampaignId();
+        }
+
         campaign = address(new PawfundCampaign(usdc, fundraiser, goalAmount, endAt));
 
-        emit CampaignCreated(campaign, fundraiser, goalAmount, endAt);
+        emit CampaignCreated(campaignId, campaign, fundraiser, goalAmount, endAt);
     }
 
     /// @dev Ownership must always remain assigned so campaign creation cannot be bricked.
