@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.36;
+pragma solidity 0.8.37;
 
 import {Test} from "forge-std-1.16.2/src/Test.sol";
 import {Ownable} from "@openzeppelin-contracts-5.6.1/access/Ownable.sol";
@@ -63,6 +63,7 @@ contract PawfundFactoryTest is Test {
         assertFalse(campaign.cancelled());
         assertEq(campaign.refundLiability(), 0);
         assertEq(campaign.withdrawableBalance(), 0);
+        assertEq(factory.campaignAddresses(CAMPAIGN_ID), campaignAddress);
     }
 
     function test_CreateCampaignEmitsEvent() external {
@@ -73,6 +74,45 @@ contract PawfundFactoryTest is Test {
 
         vm.prank(owner);
         factory.createCampaign(CAMPAIGN_ID, fundraiser, GOAL_AMOUNT, END_AT);
+    }
+
+    function test_CreateCampaignAcceptsDistinctIds() external {
+        bytes16 secondId = 0x550e8400e29b41d4a716446655440001;
+
+        vm.startPrank(owner);
+        address first = factory.createCampaign(CAMPAIGN_ID, fundraiser, GOAL_AMOUNT, END_AT);
+        address second = factory.createCampaign(secondId, fundraiser, GOAL_AMOUNT, END_AT);
+        vm.stopPrank();
+
+        assertEq(factory.campaignAddresses(CAMPAIGN_ID), first);
+        assertEq(factory.campaignAddresses(secondId), second);
+        assertTrue(first != second);
+    }
+
+    function test_RevertWhen_CampaignAlreadyDeployed() external {
+        vm.prank(owner);
+        address existing = factory.createCampaign(CAMPAIGN_ID, fundraiser, GOAL_AMOUNT, END_AT);
+
+        vm.expectRevert(abi.encodeWithSelector(PawfundFactory.CampaignAlreadyDeployed.selector, CAMPAIGN_ID, existing));
+
+        vm.prank(owner);
+        factory.createCampaign(CAMPAIGN_ID, fundraiser, GOAL_AMOUNT, END_AT);
+
+        assertEq(factory.campaignAddresses(CAMPAIGN_ID), existing);
+    }
+
+    function test_FailedCreateLeavesCampaignIdAvailable() external {
+        vm.expectRevert(PawfundCampaign.InvalidFundraiser.selector);
+
+        vm.prank(owner);
+        factory.createCampaign(CAMPAIGN_ID, address(0), GOAL_AMOUNT, END_AT);
+
+        assertEq(factory.campaignAddresses(CAMPAIGN_ID), address(0));
+
+        vm.prank(owner);
+        address campaignAddress = factory.createCampaign(CAMPAIGN_ID, fundraiser, GOAL_AMOUNT, END_AT);
+
+        assertEq(factory.campaignAddresses(CAMPAIGN_ID), campaignAddress);
     }
 
     function test_RevertWhen_CampaignIdIsZero() external {

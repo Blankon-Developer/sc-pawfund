@@ -5,7 +5,7 @@
 - `src/` contains the production contracts: `PawfundFactory.sol` deploys operator-approved campaigns, while `PawfundCampaign.sol` receives and releases USDC.
 - `test/` contains Forge tests. Shared test tokens belong in `test/mocks/`.
 - `script/` contains deployment scripts, currently `DeployPawfundFactory.s.sol`.
-- `foundry.toml` defines Solidity `0.8.36`, Osaka EVM settings, Base RPC aliases, and Soldeer dependencies.
+- `foundry.toml` defines Solidity `0.8.37`, Osaka EVM settings, Base RPC aliases, and Soldeer dependencies.
 - Generated `dependencies/`, `cache/`, `out/`, and local `.env` files must remain untracked.
 
 ## Build, Test, and Development Commands

@@ -12,10 +12,12 @@ fundraiser can withdraw funds directly to the wallet configured when the campaig
 - Only the owner can call
   `createCampaign(bytes16 campaignId, address fundraiser, uint256 goalAmount, uint256 endAt)`.
 - The factory uses one immutable canonical USDC address for every campaign.
-- Official campaigns are discovered through the `CampaignCreated` event; the factory does not
-  maintain an on-chain registry.
-- `campaignId` is backend correlation metadata emitted by the factory. It is not stored by the
-  factory or campaign, and the factory does not enforce uniqueness or idempotency.
+- Official campaigns are recorded in `campaignAddresses` and announced through the
+  `CampaignCreated` event.
+- `campaignId` is the backend UUID stored by the factory. A second `createCampaign` for the same
+  id reverts with `CampaignAlreadyDeployed` and does not return the existing campaign. Read
+  `campaignAddresses(campaignId)` or the error data for that address. The campaign contract does
+  not store the id.
 - Ownership cannot be renounced, but it can be transferred through a two-step process.
 
 ### PawfundCampaign
@@ -41,7 +43,7 @@ fundraiser can withdraw funds directly to the wallet configured when the campaig
 
 ## Toolchain and Dependencies
 
-The project uses Solidity `0.8.36`, Foundry, and Soldeer as its only dependency manager.
+The project uses Solidity `0.8.37`, Foundry, and Soldeer as its only dependency manager.
 Dependency versions are locked in `soldeer.lock`:
 
 - `forge-std 1.16.2`
@@ -122,8 +124,9 @@ automatically selects the correct canonical USDC address.
 
 `PawfundFactory` embeds the campaign creation bytecode. Deploy a new factory whenever the campaign
 implementation changes; an already deployed factory cannot create campaigns with updated behavior.
-The factory must also be redeployed for this `campaignId` release because both the function and
-event ABIs changed. Its constructor and deployment script remain unchanged.
+Redeploy the factory to get `campaignAddresses` and `CampaignAlreadyDeployed`. An already deployed
+factory does not store `campaignId` and still accepts the same id more than once. Its constructor
+and deployment script remain unchanged.
 
 ## Creating a Campaign
 
@@ -143,9 +146,17 @@ cast send <FACTORY_ADDRESS> \
   --account pawfund-operator
 ```
 
-In this example, `10000000000` represents a target of `10,000 USDC`. A zero campaign ID is rejected,
-but the same nonzero ID can be used more than once; the relayer or backend is responsible for
-preventing duplicate campaign creation.
+In this example, `10000000000` represents a target of `10,000 USDC`. A zero campaign ID is rejected.
+The same nonzero ID can be deployed only once. A repeat call reverts with
+`CampaignAlreadyDeployed(bytes16 campaignId, address campaign)`. Read the current address before
+sending another create:
+
+```shell
+cast call <FACTORY_ADDRESS> \
+  "campaignAddresses(bytes16)(address)" \
+  0x550e8400e29b41d4a716446655440000 \
+  --rpc-url base_sepolia
+```
 
 ## Donations, Withdrawals, and Refunds
 

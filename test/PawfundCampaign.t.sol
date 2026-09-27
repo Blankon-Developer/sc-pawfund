@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.36;
+pragma solidity 0.8.37;
 
 import {Test} from "forge-std-1.16.2/src/Test.sol";
 import {IERC20} from "@openzeppelin-contracts-5.6.1/token/ERC20/IERC20.sol";

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.36;
+pragma solidity 0.8.37;
 
 import {Ownable} from "@openzeppelin-contracts-5.6.1/access/Ownable.sol";
 import {Ownable2Step} from "@openzeppelin-contracts-5.6.1/access/Ownable2Step.sol";
@@ -13,6 +13,7 @@ contract PawfundFactory is Ownable2Step {
     error InvalidCampaignId();
     error InvalidUSDC(address token);
     error OwnershipRenunciationDisabled();
+    error CampaignAlreadyDeployed(bytes16 campaignId, address campaign);
 
     event CampaignCreated(
         bytes16 indexed campaignId,
@@ -24,6 +25,9 @@ contract PawfundFactory is Ownable2Step {
 
     IERC20 public immutable usdc;
 
+    /// @notice Campaign deployed for a backend id, or zero when that id has not been deployed.
+    mapping(bytes16 campaignId => address campaign) public campaignAddresses;
+
     constructor(address initialOwner, IERC20 usdc_) Ownable(initialOwner) {
         address token = address(usdc_);
         if (token == address(0) || token.code.length == 0) {
@@ -34,6 +38,8 @@ contract PawfundFactory is Ownable2Step {
     }
 
     /// @notice Deploy an official Pawfund campaign.
+    /// @dev Reverts with `CampaignAlreadyDeployed` when `campaignId` already has a campaign.
+    ///      Read `campaignAddresses` or the error data for the existing address. The call is not idempotent.
     function createCampaign(bytes16 campaignId, address fundraiser, uint256 goalAmount, uint256 endAt)
         external
         onlyOwner
@@ -43,7 +49,11 @@ contract PawfundFactory is Ownable2Step {
             revert InvalidCampaignId();
         }
 
+        address existing = campaignAddresses[campaignId];
+        if (existing != address(0)) revert CampaignAlreadyDeployed(campaignId, existing);
+
         campaign = address(new PawfundCampaign(usdc, fundraiser, goalAmount, endAt));
+        campaignAddresses[campaignId] = campaign;
 
         emit CampaignCreated(campaignId, campaign, fundraiser, goalAmount, endAt);
     }
